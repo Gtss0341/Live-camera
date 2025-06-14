@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Web Mirror</title>
+  <style>
+    video {
+      transform: scaleX(-1); /* Mirror the video */
+      width: 100%;
+      max-width: 500px;
+      border: 2px solid #333;
+      border-radius: 12px;
+    }
+  </style>
+</head>
+<body>
+  <h2>Live Mirror</h2>
+  <video id="mirror" autoplay playsinline></video>
+
+  <script>
+    const video = document.getElementById('mirror');
+
+    navigator.mediaDevices.getUserMedia({ video: true })
+      .then(stream => {
+        video.srcObject = stream;
+      })
+      .catch(error => {
+        alert("Error accessing camera: " + error.message);
+      });
+  </script>
+</body>
+</html>
