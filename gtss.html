@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Accountability Mirror</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      background: #f0f0f0;
+    }
+
+    #mirror-container {
+      position: relative;
+      width: 90%;
+      max-width: 500px;
+      margin-top: 20px;
+    }
+
+    video {
+      width: 100%;
+      transform: scaleX(-1); /* Mirror effect */
+      border-radius: 12px;
+    }
+
+    #add-note-btn {
+      margin-top: 15px;
+      padding: 10px 20px;
+      font-size: 20px;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 50%;
+      width: 50px;
+      height: 50px;
+      cursor: pointer;
+    }
+
+    .sticky-note {
+      position: absolute;
+      background: yellow;
+      padding: 10px;
+      border: 1px solid #aaa;
+      border-radius: 5px;
+      resize: none;
+      width: 120px;
+      height: 100px;
+      overflow: auto;
+      box-shadow: 2px 2px 8px rgba(0,0,0,0.2);
+      cursor: move;
+    }
+  </style>
+</head>
+<body>
+
+  <h2>🪞 Accountability Mirror</h2>
+
+  <div id="mirror-container">
+    <video id="mirror" autoplay playsinline></video>
+  </div>
+
+  <button id="add-note-btn">+</button>
+
+  <script>
+    const video = document.getElementById('mirror');
+
+    // Start webcam
+    navigator.mediaDevices.getUserMedia({ video: true })
+      .then(stream => {
+        video.srcObject = stream;
+      })
+      .catch(err => alert("Camera access denied: " + err.message));
+
+    const addNoteBtn = document.getElementById('add-note-btn');
+    const container = document.getElementById('mirror-container');
+
+    // Add sticky note
+    addNoteBtn.addEventListener('click', () => {
+      const note = document.createElement('textarea');
+      note.className = 'sticky-note';
+      note.style.top = `${50 + Math.random() * 150}px`;
+      note.style.left = `${20 + Math.random() * 150}px`;
+      note.placeholder = "Write here...";
+
+      makeDraggable(note);
+      container.appendChild(note);
+    });
+
+    // Make note draggable
+    function makeDraggable(el) {
+      let offsetX = 0, offsetY = 0, isDragging = false;
+
+      el.addEventListener('mousedown', (e) => {
+        isDragging = true;
+        offsetX = e.offsetX;
+        offsetY = e.offsetY;
+        el.style.zIndex = 1000;
+      });
+
+      document.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        el.style.left = `${e.pageX - container.offsetLeft - offsetX}px`;
+        el.style.top = `${e.pageY - container.offsetTop - offsetY}px`;
+      });
+
+      document.addEventListener('mouseup', () => {
+        isDragging = false;
+        el.style.zIndex = 1;
+      });
+    }
+  </script>
+
+</body>
+</html>
