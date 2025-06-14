@@ -1,34 +1,207 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Web Mirror</title>
+  <title>Accountability Mirror</title>
   <style>
+    body {
+      margin: 0;
+      font-family: sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      background: #f4f4f4;
+    }
+
+    #mirror-container {
+      position: relative;
+      width: 90%;
+      max-width: 500px;
+      margin-top: 20px;
+    }
+
     video {
-      transform: scaleX(-1); /* Mirror the video */
-     
-      max-width: 100vw;
-      
-      max-height: 100vh;
-      border: 2px solid #333;
+      width: 100%;
+      transform: scaleX(-1); /* Mirror effect */
       border-radius: 12px;
+      border: 3px solid #333;
+    }
+
+    #add-note-btn {
       margin: 15px;
+      padding: 10px;
+      font-size: 24px;
+      background-color: #28a745;
+      color: white;
+      border: none;
+      border-radius: 50%;
+      width: 50px;
+      height: 50px;
+      cursor: pointer;
+    }
+
+    .sticky-note {
+      position: absolute;
+      padding: 10px;
+      border: 1px solid #aaa;
+      border-radius: 5px;
+      resize: none;
+      width: 140px;
+      height: 120px;
+      overflow: auto;
+      box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.2);
+      font-family: sans-serif;
+      font-size: 14px;
+    }
+
+    .delete-btn {
+      position: absolute;
+      top: 2px;
+      right: 2px;
+      background: red;
+      color: white;
+      border: none;
+      font-size: 12px;
+      padding: 2px 6px;
+      border-radius: 3px;
+      cursor: pointer;
     }
   </style>
 </head>
 <body>
-  
-  <video id="mirror" autoplay playsinline></video>
+
+  <h2>🪞 Accountability Mirror</h2>
+
+  <div id="mirror-container">
+    <video id="mirror" autoplay playsinline></video>
+  </div>
+
+  <button id="add-note-btn">+</button>
 
   <script>
     const video = document.getElementById('mirror');
+    const container = document.getElementById('mirror-container');
+    const addBtn = document.getElementById('add-note-btn');
 
+    const colors = ["#FFF59D", "#FFAB91", "#A5D6A7", "#CE93D8", "#81D4FA"];
+
+    // Start webcam
     navigator.mediaDevices.getUserMedia({ video: true })
       .then(stream => {
         video.srcObject = stream;
       })
-      .catch(error => {
-        alert("Error accessing camera: " + error.message);
+      .catch(err => alert("Camera access denied: " + err.message));
+
+    // Load existing notes from localStorage
+    window.onload = () => {
+      const savedNotes = JSON.parse(localStorage.getItem('notes') || '[]');
+      savedNotes.forEach(data => addStickyNote(data));
+    };
+
+    // Add new sticky note
+    addBtn.addEventListener('click', () => {
+      const newNote = {
+        text: "",
+        top: 50 + Math.random() * 200,
+        left: 30 + Math.random() * 200,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        id: Date.now()
+      };
+      addStickyNote(newNote);
+      saveNote(newNote);
+    });
+
+    function addStickyNote(noteData) {
+      const note = document.createElement('textarea');
+      note.className = 'sticky-note';
+      note.style.top = `${noteData.top}px`;
+      note.style.left = `${noteData.left}px`;
+      note.style.background = noteData.color;
+      note.value = noteData.text;
+      note.dataset.id = noteData.id;
+
+      const deleteBtn = document.createElement('button');
+      deleteBtn.className = 'delete-btn';
+      deleteBtn.textContent = '×';
+      deleteBtn.onclick = () => {
+        container.removeChild(noteWrapper);
+        removeNote(noteData.id);
+      };
+
+      const noteWrapper = document.createElement('div');
+      noteWrapper.style.position = 'absolute';
+      noteWrapper.style.top = `${noteData.top}px`;
+      noteWrapper.style.left = `${noteData.left}px`;
+      noteWrapper.appendChild(note);
+      noteWrapper.appendChild(deleteBtn);
+
+      container.appendChild(noteWrapper);
+
+      makeDraggable(noteWrapper, noteData.id);
+
+      note.addEventListener('input', () => {
+        updateNote(noteData.id, note.value);
       });
+    }
+
+    // Make draggable
+    function makeDraggable(el, id) {
+      let isDragging = false;
+      let offsetX = 0, offsetY = 0;
+
+      el.addEventListener('mousedown', (e) => {
+        if (e.target.tagName === 'TEXTAREA') return;
+        isDragging = true;
+        offsetX = e.offsetX;
+        offsetY = e.offsetY;
+        el.style.zIndex = 1000;
+      });
+
+      document.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        const x = e.pageX - container.offsetLeft - offsetX;
+        const y = e.pageY - container.offsetTop - offsetY;
+        el.style.left = `${x}px`;
+        el.style.top = `${y}px`;
+        moveNote(id, x, y);
+      });
+
+      document.addEventListener('mouseup', () => {
+        isDragging = false;
+      });
+    }
+
+    // Storage helpers
+    function saveNote(noteData) {
+      const notes = JSON.parse(localStorage.getItem('notes') || '[]');
+      notes.push(noteData);
+      localStorage.setItem('notes', JSON.stringify(notes));
+    }
+
+    function updateNote(id, newText) {
+      const notes = JSON.parse(localStorage.getItem('notes') || '[]');
+      const note = notes.find(n => n.id === id);
+      if (note) {
+        note.text = newText;
+        localStorage.setItem('notes', JSON.stringify(notes));
+      }
+    }
+
+    function moveNote(id, newLeft, newTop) {
+      const notes = JSON.parse(localStorage.getItem('notes') || '[]');
+      const note = notes.find(n => n.id === id);
+      if (note) {
+        note.left = newLeft;
+        note.top = newTop;
+        localStorage.setItem('notes', JSON.stringify(notes));
+      }
+    }
+
+    function removeNote(id) {
+      let notes = JSON.parse(localStorage.getItem('notes') || '[]');
+      notes = notes.filter(n => n.id !== id);
+      localStorage.setItem('notes', JSON.stringify(notes));
+    }
   </script>
+
 </body>
 </html>
