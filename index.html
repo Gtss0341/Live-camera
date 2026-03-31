@@ -1,40 +1,298 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Accountability Mirror</title>
-  <style>
-    body {
-      margin: 0;
-      font-family: sans-serif;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      background: #f4f4f4;
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Accountability Mirror</title>
+
+<style>
+body {
+  margin: 0;
+  overflow: hidden;
+  font-family: -apple-system, sans-serif;
+  background: black;
+}
+
+video, canvas {
+  position: fixed;
+  width: 100vw;
+  height: 100vh;
+  object-fit: cover;
+}
+
+.topbar {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 10px;
+  z-index: 1000;
+}
+
+button {
+  padding: 10px 16px;
+  border-radius: 20px;
+  border: none;
+  background: rgba(255,255,255,0.2);
+  color: white;
+}
+
+/* Start screen */
+.start {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: white;
+  text-align: center;
+  z-index: 2000;
+}
+
+/* Notes */
+.note {
+  position: absolute;
+  width: 200px;
+  min-height: 150px;
+  padding: 12px;
+  border-radius: 14px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+}
+
+.note.small {
+  transform: scale(0.65);
+}
+
+.note textarea {
+  width: 100%;
+  height: 90px;
+  border: none;
+  background: transparent;
+  resize: none;
+  outline: none;
+  font-weight: 500;
+}
+
+/* Actions */
+.actions {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 8px;
+}
+
+.icon-btn {
+  border: none;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: rgba(0,0,0,0.25);
+  color: white;
+  font-size: 16px;
+}
+
+/* Done */
+.done {
+  opacity: 0.35;
+}
+.done textarea {
+  text-decoration: line-through;
+}
+</style>
+</head>
+
+<body>
+
+<div class="start" id="startScreen">
+  <h2>Accountability Mirror</h2>
+  <button onclick="startCamera()">Start</button>
+</div>
+
+<video id="video" autoplay playsinline style="display:none;"></video>
+<canvas id="canvas" style="display:none;"></canvas>
+
+<div class="topbar" id="controls" style="display:none;">
+  <button onclick="addNote()">+ Note</button>
+  <button onclick="toggleCamera()" id="camBtn">Pause</button>
+  <button onclick="undo()">Undo</button>
+</div>
+
+<script>
+const video = document.getElementById("video");
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+
+let notes = JSON.parse(localStorage.getItem("notes")) || [];
+let history = [];
+let paused = false;
+let started = false;
+
+const colors = ["#fdd835","#ef5350","#66bb6a","#42a5f5","#ab47bc"];
+
+/* CAMERA */
+async function startCamera() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: "user" }
+    });
+
+    video.srcObject = stream;
+
+    startScreen.style.display = "none";
+    video.style.display = "block";
+    controls.style.display = "flex";
+
+    started = true;
+    render();
+
+  } catch {
+    alert("Camera not working");
+  }
+}
+
+/* FREEZE */
+function toggleCamera() {
+  paused = !paused;
+
+  if (paused) {
+    canvas.width = video.videoWidth || window.innerWidth;
+    canvas.height = video.videoHeight || window.innerHeight;
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    video.style.display = "none";
+    canvas.style.display = "block";
+    camBtn.innerText = "Resume";
+  } else {
+    video.style.display = "block";
+    canvas.style.display = "none";
+    camBtn.innerText = "Pause";
+  }
+}
+
+/* SAVE */
+function save() {
+  localStorage.setItem("notes", JSON.stringify(notes));
+}
+
+/* ADD */
+function addNote() {
+  if (notes.length >= 25) return;
+
+  notes.push({
+    id: Date.now(),
+    text: "",
+    x: Math.random() * (window.innerWidth - 220),
+    y: Math.random() * (window.innerHeight - 220),
+    color: colors[Math.floor(Math.random()*colors.length)],
+    done: false,
+    small: false
+  });
+
+  save(); render();
+}
+
+/* DELETE */
+function deleteNote(id) {
+  history.push(notes.find(n => n.id === id));
+  notes = notes.filter(n => n.id !== id);
+  save(); render();
+}
+
+/* UNDO */
+function undo() {
+  if (!history.length) return;
+  notes.push(history.pop());
+  save(); render();
+}
+
+/* DONE */
+function toggleDone(id) {
+  notes = notes.map(n => {
+    if (n.id === id) n.done = !n.done;
+    return n;
+  });
+  save(); render();
+}
+
+/* TEXT */
+function updateText(id, val) {
+  notes = notes.map(n => {
+    if (n.id === id) n.text = val;
+    return n;
+  });
+  save();
+}
+
+/* SIZE */
+function toggleSize(id) {
+  notes = notes.map(n => {
+    if (n.id === id) n.small = !n.small;
+    return n;
+  });
+  save(); render();
+}
+
+/* RENDER */
+function render() {
+  if (!started) return;
+
+  document.querySelectorAll(".note").forEach(n => n.remove());
+
+  notes.forEach(note => {
+    const div = document.createElement("div");
+    div.className = "note" + (note.done ? " done" : "") + (note.small ? " small" : "");
+    div.style.left = note.x + "px";
+    div.style.top = note.y + "px";
+    div.style.background = note.color;
+
+    div.innerHTML = `
+      <textarea oninput="updateText(${note.id}, this.value)">${note.text}</textarea>
+      <div class="actions">
+        <button class="icon-btn" onclick="toggleDone(${note.id})">✔️</button>
+        <button class="icon-btn" onclick="deleteNote(${note.id})">❌</button>
+      </div>
+    `;
+
+    setupInteractions(div, note);
+    document.body.appendChild(div);
+  });
+}
+
+/* DRAG + DOUBLE TAP */
+function setupInteractions(el, note) {
+  let offsetX, offsetY, lastTap = 0;
+
+  el.addEventListener("pointerdown", (e) => {
+    offsetX = e.clientX - el.offsetLeft;
+    offsetY = e.clientY - el.offsetTop;
+
+    const now = Date.now();
+    if (now - lastTap < 300) toggleSize(note.id);
+    lastTap = now;
+
+    function move(e) {
+      const x = e.clientX - offsetX;
+      const y = e.clientY - offsetY;
+
+      el.style.left = x + "px";
+      el.style.top = y + "px";
+
+      note.x = x;
+      note.y = y;
     }
 
-    #mirror-container {
-      position: relative;
-      width: 90%;
-      max-width: 500px;
-      margin-top: 20px;
+    function up() {
+      document.removeEventListener("pointermove", move);
+      document.removeEventListener("pointerup", up);
+      save();
     }
 
-    video {
-      width: 100%;
-      transform: scaleX(-1); /* Mirror effect */
-      border-radius: 12px;
-      border: 3px solid #333;
-    }
+    document.addEventListener("pointermove", move);
+    document.addEventListener("pointerup", up);
+  });
+}
+</script>
 
-    #add-note-btn {
-      margin: 15px;
-      padding: 10px;
-      font-size: 24px;
-      background-color: #28a745;
-      color: white;
-      border: none;
-      border-radius: 50%;
-      width: 50px;
+</body>
+</html>      width: 50px;
       height: 50px;
       cursor: pointer;
     }
